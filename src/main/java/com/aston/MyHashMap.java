@@ -1,6 +1,7 @@
 package com.aston;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Custom realize HashMap (not synchronized) with basic methods:
@@ -321,4 +322,12 @@ class MyHashMap<K, V> {
         }
     }
 
+    @Override
+    public String toString() {
+        Set<Entry<K,V>> entrySet = entrySet();
+        entrySet.stream().collect(Collectors.groupingBy(e -> e.bucketIndex))
+                .entrySet()
+                .forEach(e -> System.out.println(e.toString()));
+        return null;
+    }
 }
