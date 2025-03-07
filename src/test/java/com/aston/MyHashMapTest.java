@@ -45,11 +45,9 @@ public class MyHashMapTest {
         assertEquals("0", myHashMap.remove("0"));
         assertNull(myHashMap.remove("0"));
         assertEquals(999, myHashMap.getSize());
-
         for (int i = 1; i < 1000; i++) {
             myHashMap.remove(String.valueOf(i));
         }
-
         assertEquals(0, myHashMap.getSize());
         assertNull(myHashMap.remove("0"));
     }
@@ -77,11 +75,36 @@ public class MyHashMapTest {
     public void entrySet() {
         MyHashMap<String, String> myHashMap = getMyHashMap();
         Set<MyHashMap.Entry<String, String>> SetOfMyHashMap = myHashMap.entrySet();
-        SetOfMyHashMap.remove(new MyHashMap.Entry<>("0", "0", null));
+        SetOfMyHashMap.remove(new MyHashMap.Entry<>("0","0",null));
         assertEquals(999, SetOfMyHashMap.size());
         assertEquals(1000, myHashMap.getSize());
         SetOfMyHashMap.add(new MyHashMap.Entry<>("0", "1000", null));
         assertEquals(1000, SetOfMyHashMap.size());
         assertEquals("0", myHashMap.get("0"));
     }
+
+    @Test
+    public void size() {
+        MyHashMap<String, String> myHashMap = getMyHashMap();
+        assertEquals(1000, myHashMap.getSize());
+        myHashMap.put("0", "0");
+        assertEquals(1000, myHashMap.getSize());
+    }
+
+    @Test
+    public void equalsEntrySet() {
+        MyHashMap<String, String> myHashMap = getMyHashMap();
+        MyHashMap<String, String> myHashMap2 = getMyHashMap();
+        assertEquals(myHashMap.hashCode(), myHashMap2.hashCode());
+        assertEquals(myHashMap, myHashMap2);
+
+        myHashMap.put("One","Two");
+        myHashMap2.put("Three","Four");
+
+        assertNotEquals(myHashMap, myHashMap2);
+
+        System.out.println(myHashMap);
+        System.out.println(myHashMap2);
+    }
+
 }

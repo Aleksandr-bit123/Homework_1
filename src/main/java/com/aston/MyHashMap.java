@@ -6,6 +6,10 @@ import java.util.stream.Collectors;
 /**
  * Custom realize HashMap (not synchronized) with basic methods:
  * {@code get, put, delete, values, keySet, entrySet}
+ * <p>
+ * {@code MyHashMap} has the default initial capacity
+ * (16) and the default load factor (0.75).
+ *
  * @param <K> the type of keys maintained by this map
  * @param <V> the type of mapped values
  * @author Maksimov Aleksandr
@@ -58,21 +62,21 @@ class MyHashMap<K, V> {
             return key + "=" + value;
         }
 
-        public final int hashCode() {
-            return Objects.hashCode(key) ^ Objects.hashCode(value);
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof Entry<?, ?> entry)) return false;
+            return Objects.equals(key, entry.key) && Objects.equals(value, entry.value);
         }
 
-        public final boolean equals(Object o) {
-            if (o == this)
-                return true;
-
-            return o instanceof MyHashMap.Entry<?, ?> e
-                    && Objects.equals(key, e.getKey())
-                    && Objects.equals(value, e.getValue());
+        @Override
+        public int hashCode() {
+            return Objects.hash(key, value);
         }
+
+
     }
 
-    private final MyHashMap.Entry<K, V>[] buckets;
+    private MyHashMap.Entry<K, V>[] buckets;
 
     //The number of key-value mappings contained in this map.
     private int size = 0;
@@ -97,12 +101,12 @@ class MyHashMap<K, V> {
     // Private methods
 
     private int getBucketSize() {
-        return this.buckets.length;
+        return this.buckets.length - 1;
     }
 
     //Hash-function. Return index of bucket.
     private int getBucketIndex(K key) {
-        return getHash(key) % getBucketSize();
+        return Math.abs(getHash(key) % getBucketSize());
     }
 
     //Return hash code of key
@@ -110,28 +114,26 @@ class MyHashMap<K, V> {
         return Objects.hashCode(key);
     }
 
-    /* ------------------------------------------------------------ */
-    // Public methods
-
-    /**
-     * Return the number of key-value mappings contained in this map.
-     **/
-    public int getSize() {
-        return size;
+    //Check bucket capacity
+    private boolean checkBucketCapacity() {
+        int bucketLength = getBucketSize();
+        float currentLoadFactor = (float) size / bucketLength;
+        return currentLoadFactor > DEFAULT_LOAD_FACTOR && bucketLength < MAXIMUM_CAPACITY;
     }
-    /**
-     * Associates the specified value with the specified key in this map.
-     * If the map previously contained a mapping for the key, the old
-     * value is replaced.
-     *
-     * @param key   key with which the specified value is to be associated
-     * @param value value to be associated with the specified key
-     * @return the previous value associated with {@code key}, or
-     * {@code null} if there was no mapping for {@code key}.
-     * (A {@code null} return can also indicate that the map
-     * previously associated {@code null} with {@code key}.)
-     */
-    public V put(K key, V value) {
+
+    //Resize buckets
+    private void resizeBuckets() {
+        Set<Entry<K, V>> entries = entrySet();
+        int newCapacity = getBucketSize() * 2;
+        this.buckets = new Entry[newCapacity];
+        size = 0;
+        for (Entry<K, V> entry : entries) {
+            putEntry(entry.getKey(), entry.getValue());
+        }
+    }
+
+    //for put method. Add Entry into Map.
+    private V putEntry(K key, V value) {
         Entry<K, V> entry = new Entry<>(key, value, null);
 
         int bucketIndex = getBucketIndex(key);
@@ -160,6 +162,36 @@ class MyHashMap<K, V> {
                 return entry.getValue();
             }
         }
+    }
+    /* ------------------------------------------------------------ */
+
+    // Public methods
+
+    /**
+     * Return the number of key-value mappings contained in this map.
+     **/
+    public int getSize() {
+        return size;
+    }
+
+    /**
+     * Associates the specified value with the specified key in this map.
+     * If the map previously contained a mapping for the key, the old
+     * value is replaced.
+     *
+     * @param key   key with which the specified value is to be associated
+     * @param value value to be associated with the specified key
+     * @return the previous value associated with {@code key}, or
+     * {@code null} if there was no mapping for {@code key}.
+     * (A {@code null} return can also indicate that the map
+     * previously associated {@code null} with {@code key}.)
+     */
+    public V put(K key, V value) {
+        V val = putEntry(key, value);
+        if (checkBucketCapacity()) {
+            resizeBuckets();
+        }
+        return val;
     }
 
     /**
@@ -197,22 +229,26 @@ class MyHashMap<K, V> {
         if (existing == null) {
             return null;
         } else {
-            Entry<K, V> previousExisting = buckets[bucketIndex];
             V value;
-            while (existing.next != null) {
-                if (Objects.equals(existing.key, key)) {
-                   if (previousExisting == existing) {
-                       buckets[bucketIndex] = existing.next;
-                   } else {
-                       previousExisting.next = existing.next;
-                   }
-                    value = existing.value;
+            Entry<K, V> nextExisting = buckets[bucketIndex].next;
+            //check first element
+            if (Objects.equals(existing.key, key) && nextExisting != null) {
+                buckets[bucketIndex] = nextExisting;
+                size--;
+                value = existing.value;
+                return value;
+            }
+            //check middle elements
+            while (nextExisting != null) {
+                if (Objects.equals(nextExisting.key, key)) {
                     size--;
+                    value = nextExisting.value;
                     return value;
                 }
-                previousExisting = existing;
                 existing = existing.next;
+                nextExisting = nextExisting.next;
             }
+            //check last element
             if (Objects.equals(existing.key, key)) {
                 value = existing.value;
                 buckets[bucketIndex] = null;
@@ -267,7 +303,7 @@ class MyHashMap<K, V> {
     }
 
     /* ------------------------------------------------------------ */
-    // iterators
+// iterators
     abstract class HashIterator {
         Entry<K, V> next;        // next entry to return
         Entry<K, V> current;     // current entry
@@ -323,11 +359,31 @@ class MyHashMap<K, V> {
     }
 
     @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof MyHashMap<?, ?> myHashMap)) return false;
+        return size == myHashMap.size && Objects.deepEquals(entrySet(), myHashMap.entrySet());
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(Arrays.hashCode(buckets), size);
+    }
+
+//    @Override
+//    public String toString() {
+//        return "MyHashMap{" +
+//                "buckets=" + Arrays.toString(buckets) +
+//                ", size=" + size + ", length=" + buckets.length +
+//                '}';
+//    }
+
+
+    @Override
     public String toString() {
-        Set<Entry<K,V>> entrySet = entrySet();
-        entrySet.stream().collect(Collectors.groupingBy(e -> e.bucketIndex))
+        System.out.println("MyHashMap" +  this.getClass().getSimpleName());
+        entrySet().stream().collect(Collectors.groupingBy( e -> e.bucketIndex))
                 .entrySet()
-                .forEach(e -> System.out.println(e.toString()));
-        return null;
+                .forEach(System.out::println);
+        return "MyHashMap" + this.getClass().getSimpleName() + "End";
     }
 }
